@@ -55,7 +55,7 @@ def main() -> None:
                                     value=0, step=1)
 
     st.subheader('Upload Historical Price Data')
-    st.write('Upload one CSV file per ticker. Files must be named **TICKER_prices.csv** and
+    st.write('Upload one CSV file per ticker. Files must be named **TICKER_prices.csv** and \
 contain a `Date` column (YYYY‑MM‑DD) and a `Close` or `Adj Close` price column.')
     uploaded_files = st.file_uploader('Upload CSV files', type=['csv'], accept_multiple_files=True)
 
