@@ -53,34 +53,49 @@ def load_price_file(file_obj: IO[bytes], filename: str) -> pd.Series:
     Returns
     -------
     Series
-        Time series of prices indexed by datetime.  The series name is
-        the ticker.
+        Time series of prices indexed by datetime. The series name is the ticker.
 
     Raises
     ------
     ValueError
-        If the file does not contain a recognised price column.
+        If the file does not contain a recognised price column or date format.
     """
     ticker = parse_ticker_from_filename(filename)
     df = pd.read_csv(file_obj)
-    # Normalise column names
+
+    # Normalize column names
     df.columns = [c.strip() for c in df.columns]
-    # Identify price column
+
+    # Identify the price column (Close/Adj Close/Price)
     price_col = None
-    for candidate in ['Adj Close', 'Adj close', 'AdjClose', 'Close', 'close', 'Adj Close*', 'Adj_Close']:
+    for candidate in ['Price', 'Adj Close', 'Adj close', 'AdjClose', 'Close', 'close', 'Adj Close*', 'Adj_Close']:
         if candidate in df.columns:
             price_col = candidate
             break
     if price_col is None:
-        raise ValueError(f"File {filename} does not contain a 'Close' or 'Adj Close' column.")
-    # Parse dates
+        raise ValueError(f"File {filename} does not contain a 'Close', 'Adj Close', or 'Price' column.")
+
+    # Parse dates using multiple formats
     if 'Date' not in df.columns:
         raise ValueError(f"File {filename} does not contain a 'Date' column.")
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    try:
+        df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d')
+    except Exception:
+        try:
+            df['Date'] = pd.to_datetime(df['Date'], format='%d-%m-%Y')
+        except Exception:
+            df['Date'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
+
+    # Drop rows with unrecognized dates
     df = df.dropna(subset=['Date'])
+    if df.empty:
+        raise ValueError(f"Could not parse dates in file {filename}. Please use YYYY-MM-DD or DD-MM-YYYY format.")
+
+    # Sort by date and extract the price series
     df = df.sort_values('Date')
     series = df.set_index('Date')[price_col].astype(float)
     series.name = ticker
+
     return series
 
 
