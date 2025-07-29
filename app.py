@@ -55,7 +55,7 @@ def main() -> None:
     n_portfolios = st.sidebar.number_input('Number of Portfolios to simulate', min_value=100, max_value=5000,
                                            value=500, step=100)
     seed = st.sidebar.number_input('Random Seed (optional)', min_value=0, max_value=2**31-1,
-                                    value=0, step=1
+                                    value=0, step=1,
                                     help='Set a random number to get the same simulation results every time. Leave as 0 for random results on each run.')
 
     st.subheader('Upload Historical Price Data')
