@@ -92,8 +92,9 @@ def load_price_file(file_obj: IO[bytes], filename: str) -> pd.Series:
         raise ValueError(f"Could not parse dates in file {filename}. Please use YYYY-MM-DD or DD-MM-YYYY format.")
 
     # Sort by date and extract the price series
-    df = df.sort_values('Date')
-    series = df.set_index('Date')[price_col].astype(float)
+    df[price_col] = df[price_col].astype(str).str.replace(',', '', regex=False).astype(float)
+    series = df.set_index('Date')[price_col]
+
     series.name = ticker
 
     return series
