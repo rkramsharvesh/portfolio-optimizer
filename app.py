@@ -42,10 +42,7 @@ def main() -> None:
     st.sidebar.subheader('Market Assumptions')
     st.sidebar.write(f'Equity Risk Premium (ERP): {country_data.erp:.2f}%')
     st.sidebar.write(f'Country Risk Premium (CRP): {country_data.crp:.2f}%')
-    # Dynamically calculate Mature ERP = ERP - CRP
-    # Dr. Damodaran’s ERP = Mature ERP + CRP → So we derive Mature ERP = ERP - CRP
-    derived_mature_erp = country_data.erp - country_data.crp
-    st.sidebar.write(f'Mature ERP (derived): {derived_mature_erp:.2f}%')
+    st.sidebar.write(f'Mature ERP (derived): {country_data.mature_erp:.2f}%')
     rf_input = st.sidebar.number_input('Risk-Free Rate (%)', min_value=0.0, max_value=100.0,
                                        value=float(country_data.rf), step=0.01,
                                        help='Override the default risk-free rate for your country (if needed).')
