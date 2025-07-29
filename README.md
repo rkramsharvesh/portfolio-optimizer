@@ -45,7 +45,9 @@ overridden at run time.
 
 **Web App**
 
-*Live Demo:* [https://rkramsharvesh-portfolio-optimizer.streamlit.app/](https://rkramsharvesh-portfolio-optimizer.streamlit.app/)  
+*Live Demo:* [https://rkramsharvesh-portfolio-optimizer.streamlit.app/](https://rkramsharvesh-portfolio-optimizer.streamlit.app/)
+
+**Running Locally**
 
 1. Ensure the environment has Python 3.11 and the following libraries
    available: `streamlit`, `pandas`, `numpy`, and `matplotlib`.  These are
