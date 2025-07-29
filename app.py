@@ -59,7 +59,7 @@ def main() -> None:
     )
     seed = st.sidebar.number_input(
         'Random Seed (optional)',
-        min_value=0, max_value=2**31-1,
+        min_value=0, max_value=2**31 - 1,
         value=0, step=1,
         help='Set a random number to get the same simulation results every time. '
              'Leave as 0 for random results on each run.'
@@ -67,7 +67,7 @@ def main() -> None:
 
     st.subheader('Upload Historical Price Data')
     st.write(
-        "Upload one CSV file per ticker (minimum of 3 and a maximum of 10). "
+        "Upload one CSV file per ticker (minimum of 3 and maximum of 10). "
         "Files must be named **TICKER_prices.csv** and contain a `Date` column "
         "(YYYY-MM-DD or DD-MM-YYYY) and a `Close`, `Adj Close` or `Price` column."
     )
@@ -77,6 +77,7 @@ def main() -> None:
         tickers: List[str] = []
         price_series = []
         error_files = []
+
         for file in uploaded_files:
             try:
                 series = load_price_file(file, file.name)
@@ -111,30 +112,44 @@ def main() -> None:
                                 random_state=int(seed) if seed else None,
                             )
 
-                        # Extract the two extremes
-                        max_sharpe = optimal_dict['max_sharpe']
-                        min_vol = optimal_dict['min_vol']
+                        # === Horizon Scaling ===
+                        # Convert "1Y","3Y","5Y","10+Y" to integer years
+                        try:
+                            h = int(investment_horizon.rstrip('Y').rstrip('+'))
+                        except ValueError:
+                            h = 1
 
-                        # Choose recommended portfolio based on risk tolerance
+                        # Scale returns and volatility
+                        sim_df['Return_h'] = (1 + sim_df['Return']) ** h - 1
+                        sim_df['Volatility_h'] = sim_df['Volatility'] * (h ** 0.5)
+
+                        # Compute horizon-adjusted Sharpe
+                        rf_rate = rf_input / 100.0
+                        sim_df['Sharpe_h'] = (
+                            sim_df['Return_h'] - rf_rate * h
+                        ) / sim_df['Volatility_h']
+
+                        # === Portfolio Selection Based on Risk Tolerance ===
                         if risk_tolerance == 'High':
-                            chosen = max_sharpe
+                            idx = sim_df['Sharpe_h'].idxmax()
                             label = 'Max Sharpe'
                         elif risk_tolerance == 'Low':
-                            chosen = min_vol
+                            idx = sim_df['Volatility_h'].idxmin()
                             label = 'Min Volatility'
                         else:  # Moderate
-                            median_vol = sim_df['Volatility'].median()
-                            idx = (sim_df['Volatility'] - median_vol).abs().idxmin()
-                            row = sim_df.loc[idx]
-                            chosen = {
-                                'weights': row[tickers].to_dict(),
-                                'return': row['Return'],
-                                'volatility': row['Volatility'],
-                                'sharpe': row['Sharpe']
-                            }
+                            median_vol = sim_df['Volatility_h'].median()
+                            idx = (sim_df['Volatility_h'] - median_vol).abs().idxmin()
                             label = 'Median Volatility'
 
-                        # Display recommended portfolio
+                        row = sim_df.loc[idx]
+                        chosen = {
+                            'weights': {t: row[t] for t in tickers},
+                            'return': row['Return_h'],
+                            'volatility': row['Volatility_h'],
+                            'sharpe': row['Sharpe_h'],
+                        }
+
+                        # === Display Results ===
                         st.subheader(f'Recommended Portfolio ({label})')
                         col1, col2 = st.columns(2)
                         with col1:
@@ -143,28 +158,32 @@ def main() -> None:
                         with col2:
                             st.metric('Sharpe Ratio', f'{chosen["sharpe"]:.2f}')
 
-                        # Efficient frontier plot (always show full scatter)
+                        # Efficient Frontier (horizon-scaled)
                         st.subheader('Efficient Frontier')
                         import matplotlib.pyplot as plt
                         fig, ax = plt.subplots(figsize=(8, 6))
                         scatter = ax.scatter(
-                            sim_df['Volatility'], sim_df['Return'],
-                            c=sim_df['Sharpe'], cmap='viridis', s=10
+                            sim_df['Volatility_h'],
+                            sim_df['Return_h'],
+                            c=sim_df['Sharpe_h'],
+                            cmap='viridis',
+                            s=10
                         )
-                        # highlight the chosen portfolio
                         ax.scatter(
-                            chosen['volatility'], chosen['return'],
-                            marker='*', color='red', s=150, label=f'Chosen ({label})'
+                            chosen['volatility'],
+                            chosen['return'],
+                            marker='*', color='red',
+                            s=150, label=f'Chosen ({label})'
                         )
-                        ax.set_xlabel('Volatility')
-                        ax.set_ylabel('Expected Return')
+                        ax.set_xlabel('Volatility (horizon scaled)')
+                        ax.set_ylabel('Return (horizon scaled)')
                         ax.set_title('Efficient Frontier')
                         ax.legend()
                         cbar = fig.colorbar(scatter, ax=ax)
-                        cbar.set_label('Sharpe Ratio')
+                        cbar.set_label('Sharpe Ratio (horizon scaled)')
                         st.pyplot(fig)
 
-                        # Allocation table for the chosen portfolio
+                        # Portfolio Allocation Table
                         st.subheader('Portfolio Allocation')
                         allocation_df = pd.DataFrame.from_dict(
                             chosen['weights'], orient='index', columns=['Weight']
@@ -172,7 +191,7 @@ def main() -> None:
                         allocation_df['Weight'] = allocation_df['Weight'].map(lambda x: f'{x:.2%}')
                         st.table(allocation_df.T)
 
-                        # Download CSV of all simulations
+                        # Download CSV of all portfolios
                         csv_data = sim_df.to_csv(index=False).encode('utf-8')
                         st.download_button(
                             '📄 Download Simulation CSV',
@@ -181,7 +200,7 @@ def main() -> None:
                             mime='text/csv'
                         )
 
-                        # Generate PDF report on the fly using chosen portfolio
+                        # Generate PDF Report with chosen portfolio
                         buffer = io.BytesIO()
                         user_profile = {
                             'name': name,
@@ -191,13 +210,17 @@ def main() -> None:
                             'horizon': investment_horizon,
                         }
                         market_data = {
-                            'rf': rf_input / 100.0,
-                            'erp': country_data.erp / 100.0,     # use total ERP here
+                            'rf': rf_rate,
+                            'erp': country_data.erp / 100.0,
                             'crp': country_data.crp / 100.0,
                         }
                         generate_pdf_report(
-                            buffer, user_profile, market_data,
-                            chosen, sim_df, int(n_portfolios)
+                            buffer,
+                            user_profile,
+                            market_data,
+                            chosen,
+                            sim_df,
+                            int(n_portfolios)
                         )
                         st.download_button(
                             '📑 Download PDF Report',
@@ -209,7 +232,7 @@ def main() -> None:
     # Footer citation
     st.markdown('---')
     st.markdown(
-        'Data source for equity and country risk premium: Aswath Damodaran’s January 2025 update'
+        'Data source for equity and country risk premiums: Aswath Damodaran’s January 2025 update.'
     )
 
 
