@@ -42,7 +42,10 @@ def main() -> None:
     st.sidebar.subheader('Market Assumptions')
     st.sidebar.write(f'Equity Risk Premium (ERP): {country_data.erp:.2f}%')
     st.sidebar.write(f'Country Risk Premium (CRP): {country_data.crp:.2f}%')
-    st.sidebar.write(f'Mature ERP: {country_data.mature_erp:.2f}%')
+    # Dynamically calculate Mature ERP = ERP - CRP
+    # Dr. Damodaran’s ERP = Mature ERP + CRP → So we derive Mature ERP = ERP - CRP
+    derived_mature_erp = country_data.erp - country_data.crp
+    st.sidebar.write(f'Mature ERP (derived): {derived_mature_erp:.2f}%')
     rf_input = st.sidebar.number_input('Risk-Free Rate (%)', min_value=0.0, max_value=100.0,
                                        value=float(country_data.rf), step=0.01,
                                        help='Override the default risk-free rate for your country (if needed).')
@@ -52,7 +55,8 @@ def main() -> None:
     n_portfolios = st.sidebar.number_input('Number of Portfolios to simulate', min_value=100, max_value=5000,
                                            value=500, step=100)
     seed = st.sidebar.number_input('Random Seed (optional)', min_value=0, max_value=2**31-1,
-                                    value=0, step=1)
+                                    value=0, step=1
+                                    help='Set a random number to get the same simulation results every time. Leave as 0 for random results on each run.')
 
     st.subheader('Upload Historical Price Data')
     st.write('Upload one CSV file per ticker (minimum of 3 and a maximum of 10). Files must be named **TICKER_prices.csv** and \
