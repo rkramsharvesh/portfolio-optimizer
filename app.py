@@ -23,7 +23,7 @@ from pdf_report import generate_pdf_report
 
 def main() -> None:
     st.set_page_config(page_title='Portfolio Optimiser', layout='wide')
-    st.title('📈 Portfolio Optimisation using Monte Carlo Simulation')
+    st.title('Portfolio Optimisation using Monte Carlo Simulation')
 
     # Sidebar: investor profile
     st.sidebar.header('Investor Profile')
@@ -45,17 +45,17 @@ def main() -> None:
     st.sidebar.write(f'Mature ERP: {country_data.mature_erp:.2f}%')
     rf_input = st.sidebar.number_input('Risk-Free Rate (%)', min_value=0.0, max_value=100.0,
                                        value=float(country_data.rf), step=0.01,
-                                       help='Override the default risk-free rate for your country.')
+                                       help='Override the default risk-free rate for your country (if needed).')
 
     # Monte Carlo settings
     st.sidebar.subheader('Simulation Settings')
-    n_portfolios = st.sidebar.number_input('Number of Portfolios', min_value=100, max_value=5000,
+    n_portfolios = st.sidebar.number_input('Number of Portfolios to simulate', min_value=100, max_value=5000,
                                            value=500, step=100)
     seed = st.sidebar.number_input('Random Seed (optional)', min_value=0, max_value=2**31-1,
                                     value=0, step=1)
 
     st.subheader('Upload Historical Price Data')
-    st.write('Upload one CSV file per ticker. Files must be named **TICKER_prices.csv** and \
+    st.write('Upload one CSV file per ticker (minimum of 3 and a maximum of 10). Files must be named **TICKER_prices.csv** and \
 contain a `Date` column (YYYY‑MM‑DD) and a `Close` or `Adj Close` price column.')
     uploaded_files = st.file_uploader('Upload CSV files', type=['csv'], accept_multiple_files=True)
 
@@ -151,8 +151,7 @@ contain a `Date` column (YYYY‑MM‑DD) and a `Close` or `Adj Close` price col
     # Footer citation
     st.markdown('---')
     st.markdown(
-        'Data source for equity and country risk premia: Aswath Damodaran’s January 2025 update ' +
-        '【90480415847186†L0-L34】【325874986942418†L6472-L6476】【325874986942418†L5501-L5504】.'
+        'Data source for equity and country risk premium: Aswath Damodaran’s January 2025 update '
     )
 
 
