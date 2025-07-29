@@ -67,7 +67,7 @@ def main() -> None:
 
     st.subheader('Upload Historical Price Data')
     st.write(
-        "Upload one CSV file per ticker (minimum of 3 and maximum of 10). "
+        "Upload one CSV file per ticker (min 3, max 10). "
         "Files must be named **TICKER_prices.csv** and contain a `Date` column "
         "(YYYY-MM-DD or DD-MM-YYYY) and a `Close`, `Adj Close` or `Price` column."
     )
@@ -113,33 +113,43 @@ def main() -> None:
                             )
 
                         # === Horizon Scaling ===
-                        # Convert "1Y","3Y","5Y","10+Y" to integer years
                         try:
                             h = int(investment_horizon.rstrip('Y').rstrip('+'))
                         except ValueError:
                             h = 1
-
-                        # Scale returns and volatility
                         sim_df['Return_h'] = (1 + sim_df['Return']) ** h - 1
                         sim_df['Volatility_h'] = sim_df['Volatility'] * (h ** 0.5)
-
-                        # Compute horizon-adjusted Sharpe
                         rf_rate = rf_input / 100.0
                         sim_df['Sharpe_h'] = (
                             sim_df['Return_h'] - rf_rate * h
                         ) / sim_df['Volatility_h']
 
-                        # === Portfolio Selection Based on Risk Tolerance ===
-                        if risk_tolerance == 'High':
-                            idx = sim_df['Sharpe_h'].idxmax()
-                            label = 'Max Sharpe'
-                        elif risk_tolerance == 'Low':
-                            idx = sim_df['Volatility_h'].idxmin()
-                            label = 'Min Volatility'
+                        # === Apply Risk Tolerance Filter ===
+                        if risk_tolerance == 'Low':
+                            vol_thresh = sim_df['Volatility_h'].quantile(0.25)
+                            candidate_df = sim_df[sim_df['Volatility_h'] <= vol_thresh]
+                            rt_label = 'Low Risk'
+                        elif risk_tolerance == 'High':
+                            candidate_df = sim_df
+                            rt_label = 'High Risk'
                         else:  # Moderate
-                            median_vol = sim_df['Volatility_h'].median()
-                            idx = (sim_df['Volatility_h'] - median_vol).abs().idxmin()
-                            label = 'Median Volatility'
+                            candidate_df = sim_df
+                            rt_label = 'Moderate Risk'
+
+                        # === Select by Investment Goal within candidate_df ===
+                        if investment_goal == 'Capital Preservation':
+                            idx = candidate_df['Volatility_h'].idxmin()
+                            goal_label = 'Min Volatility'
+                        elif investment_goal == 'High Risk-High Return':
+                            idx = candidate_df['Return_h'].idxmax()
+                            goal_label = 'High Return'
+                        elif investment_goal == 'Long-Term Growth':
+                            idx = candidate_df['Sharpe_h'].idxmax()
+                            goal_label = 'Max Sharpe'
+                        else:  # Balanced
+                            med_vol = candidate_df['Volatility_h'].median()
+                            idx = (candidate_df['Volatility_h'] - med_vol).abs().idxmin()
+                            goal_label = 'Balanced'
 
                         row = sim_df.loc[idx]
                         chosen = {
@@ -149,49 +159,45 @@ def main() -> None:
                             'sharpe': row['Sharpe_h'],
                         }
 
-                        # === Display Results ===
-                        st.subheader(f'Recommended Portfolio ({label})')
-                        col1, col2 = st.columns(2)
-                        with col1:
+                        # === Display Recommended Portfolio ===
+                        st.subheader(f'Recommended Portfolio ({rt_label} + {goal_label})')
+                        c1, c2 = st.columns(2)
+                        with c1:
                             st.metric('Return', f'{chosen["return"]:.2%}')
                             st.metric('Volatility', f'{chosen["volatility"]:.2%}')
-                        with col2:
+                        with c2:
                             st.metric('Sharpe Ratio', f'{chosen["sharpe"]:.2f}')
 
-                        # Efficient Frontier (horizon-scaled)
+                        # === Efficient Frontier (Horizon-Scaled) ===
                         st.subheader('Efficient Frontier')
                         import matplotlib.pyplot as plt
                         fig, ax = plt.subplots(figsize=(8, 6))
-                        scatter = ax.scatter(
-                            sim_df['Volatility_h'],
-                            sim_df['Return_h'],
-                            c=sim_df['Sharpe_h'],
-                            cmap='viridis',
-                            s=10
+                        sc = ax.scatter(
+                            sim_df['Volatility_h'], sim_df['Return_h'],
+                            c=sim_df['Sharpe_h'], cmap='viridis', s=10
                         )
                         ax.scatter(
-                            chosen['volatility'],
-                            chosen['return'],
-                            marker='*', color='red',
-                            s=150, label=f'Chosen ({label})'
+                            chosen['volatility'], chosen['return'],
+                            marker='*', color='red', s=150,
+                            label=f'Chosen ({rt_label}+{goal_label})'
                         )
                         ax.set_xlabel('Volatility (horizon scaled)')
                         ax.set_ylabel('Return (horizon scaled)')
                         ax.set_title('Efficient Frontier')
                         ax.legend()
-                        cbar = fig.colorbar(scatter, ax=ax)
+                        cbar = fig.colorbar(sc, ax=ax)
                         cbar.set_label('Sharpe Ratio (horizon scaled)')
                         st.pyplot(fig)
 
-                        # Portfolio Allocation Table
+                        # === Allocation Table ===
                         st.subheader('Portfolio Allocation')
-                        allocation_df = pd.DataFrame.from_dict(
+                        alloc_df = pd.DataFrame.from_dict(
                             chosen['weights'], orient='index', columns=['Weight']
                         )
-                        allocation_df['Weight'] = allocation_df['Weight'].map(lambda x: f'{x:.2%}')
-                        st.table(allocation_df.T)
+                        alloc_df['Weight'] = alloc_df['Weight'].map(lambda x: f'{x:.2%}')
+                        st.table(alloc_df.T)
 
-                        # Download CSV of all portfolios
+                        # === Download Simulation CSV ===
                         csv_data = sim_df.to_csv(index=False).encode('utf-8')
                         st.download_button(
                             '📄 Download Simulation CSV',
@@ -200,7 +206,7 @@ def main() -> None:
                             mime='text/csv'
                         )
 
-                        # Generate PDF Report with chosen portfolio
+                        # === Generate PDF Report ===
                         buffer = io.BytesIO()
                         user_profile = {
                             'name': name,
@@ -215,12 +221,8 @@ def main() -> None:
                             'crp': country_data.crp / 100.0,
                         }
                         generate_pdf_report(
-                            buffer,
-                            user_profile,
-                            market_data,
-                            chosen,
-                            sim_df,
-                            int(n_portfolios)
+                            buffer, user_profile, market_data,
+                            chosen, sim_df, int(n_portfolios)
                         )
                         st.download_button(
                             '📑 Download PDF Report',
