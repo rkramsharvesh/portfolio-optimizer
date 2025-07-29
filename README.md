@@ -17,7 +17,7 @@ overridden at run time.
   selection drives the choice of ERP/CRP and the default risk‑free rate.
 * **Price data upload** – Accepts one or more CSV files named
   `TICKER_prices.csv`.  Each file must contain at least a `Date` column
-  (in ISO format, e.g. `YYYY‑MM‑DD`) and a `Close` or `Adj Close` column.  The
+  (in ISO format, e.g. `YYYY‑MM‑DD`, `DD-MM-YYYY`) and a `Close` / `Adj Close` / `Price` column.  The
   app automatically computes percentage returns, aligns them on common dates
   and uses the resulting return matrix in the optimisation.
 * **Market assumptions** – For the selected country the app displays the
