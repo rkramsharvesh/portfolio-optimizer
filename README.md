@@ -94,7 +94,7 @@ Date,Close,Adj Close
 ```
 
 If the date format in your files differs, please adjust it to ISO
-(`YYYY‑MM‑DD`) before uploading.
+(`YYYY‑MM‑DD` or `DD-MM-YYYY`) before uploading.
 
 ## Risk‑free rates
 
